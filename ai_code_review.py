@@ -72,7 +72,7 @@ def main() -> None:
 
     # 4-1) 코멘트가 없으면 Approve
     if not comments:
-        pr.create_review(body="Approved by AI.", event="APPROVE")
+        pr.create_review(body="LGTM :)", event="APPROVE")
         print("[SKIP] AI 리뷰 결과 코멘트가 없어 Approve 처리했습니다.")
         return
 
