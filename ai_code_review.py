@@ -70,6 +70,11 @@ def main() -> None:
     g = get_github_client(github_token)        # -> Github
     pr = get_pull_request(g, repo_name, pr_number)  # -> PullRequest
 
+    # 1-1) 이미 'COMMENTED' 또는 'CHANGES_REQUESTED' 리뷰가 있는지 확인
+    if user_already_commented_or_requested_changes(g, pr):
+        print("[SKIP] 이미 리뷰가 완료되어 새 리뷰를 남기지 않고 종료합니다.")
+        return
+
     # 2) PullRequest의 파일별 patch를 모아서 unidiff PatchSet 생성
     patch_set = get_diff_patchset(pr)          # -> PatchSet
 
@@ -82,6 +87,12 @@ def main() -> None:
         rules_text=rules_text,
         system_prompt=system_prompt
     )                                          # -> OpenAIObject or dict
+
+    # 4-1) 코멘트가 없으면 Approve
+    if not comments:
+        pr.create_review(body="Approved by AI.", event="APPROVE")
+        print("[SKIP] AI 리뷰 결과 코멘트가 없어 Approve 처리했습니다.")
+        return
 
     # 5) GitHub PR에 코멘트 등록
     post_comments_to_pr(pr, comments)
@@ -114,6 +125,26 @@ def get_pull_request(g: Github, repo_name: str, pr_number: int) -> PullRequest:
     """
     repo = g.get_repo(repo_name)
     return repo.get_pull(pr_number)
+
+
+def user_already_commented_or_requested_changes(
+    g: Github,
+    pr: PullRequest
+) -> bool:
+    """
+    현재 유저(current_user_login)가 이미 'APPROVED', 'COMMENTED', 'CHANGES_REQUESTED' 상태의 리뷰를 남겼는지 확인.
+    있으면 True, 없으면 False.
+    """
+    current_user_login = g.get_user().login
+
+    reviews = pr.get_reviews().reversed
+    for review in reviews:
+        if review.user.login != current_user_login:
+            continue
+
+        if review.state in ["APPROVED", "COMMENTED", "CHANGES_REQUESTED"]:
+            return True
+    return False
 
 
 def get_diff_patchset(pr: PullRequest) -> PatchSet:
