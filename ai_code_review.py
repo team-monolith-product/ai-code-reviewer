@@ -55,12 +55,11 @@ def main() -> None:
     github_token = os.getenv("GITHUB_TOKEN")
     repo_name = os.getenv("GITHUB_REPOSITORY")  # "owner/repo"
     pr_number_str = os.getenv("PR_NUMBER")      # e.g. "123"
-    openai_api_key = os.getenv("OPENAI_API_KEY")
 
-    if not github_token or not repo_name or not pr_number_str or not openai_api_key:
+    if not github_token or not repo_name or not pr_number_str:
         raise EnvironmentError(
             "Missing one or more required environment variables: "
-            "GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, OPENAI_API_KEY."
+            "GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER."
         )
 
     pr_number = int(pr_number_str)
@@ -158,7 +157,6 @@ def get_chatgpt_review(
     Args:
         patch_set (PatchSet): The unidiff PatchSet representing changed files/lines.
         rules_text (str): The loaded coding guidelines.
-        openai_api_key (str): The API key for openai.
 
     Returns:
         ChatCompletion: The model's response object, typically from openai.ChatCompletion.create().
