@@ -140,11 +140,11 @@ def load_coding_rules() -> str:
     Returns:
         str: The entire text of the coding rules.
     """
-    rules_path = ".github/coding-rules.md"
+    rules_path = "/github/workspace/.github/coding-rules.md"
     if os.path.exists(rules_path):
         with open(rules_path, "r", encoding="utf-8") as f:
             return f.read()
-    return "No specific coding rules found. Please define coding-rules.md if needed."
+    raise FileNotFoundError(f"Could not find coding rules file at: {rules_path}")
 
 
 def get_chatgpt_review(
