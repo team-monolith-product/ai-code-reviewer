@@ -67,8 +67,9 @@ def main() -> None:
     comments = get_chatgpt_review(
         patch_set=patch_set,
         rules_text=rules_text,
-        system_prompt=system_prompt
-    )                                          # -> OpenAIObject or dict
+        system_prompt=system_prompt,
+        pr_body=pr.body
+    )
 
     # 4-1) 코멘트가 없으면 Approve
     if not comments:
@@ -193,7 +194,8 @@ def load_coding_rules() -> str:
 def get_chatgpt_review(
     patch_set: PatchSet,
     rules_text: str,
-    system_prompt: str
+    system_prompt: str,
+    pr_body: str
 ) -> List[Dict[str, Any]]:
     """
     Send patch info + coding rules to ChatGPT(O1) (via openai) and return raw response.
@@ -208,7 +210,7 @@ def get_chatgpt_review(
     client = OpenAI()
 
     # 1) 프롬프트 생성
-    prompt = build_prompt_from_patchset_and_rules(patch_set, rules_text)
+    prompt = build_prompt_from_patchset_and_rules(patch_set, rules_text, pr_body)
 
     # 2) ChatCompletion 호출
     response = client.chat.completions.create(
@@ -269,7 +271,11 @@ SCHEMA = {
 }
 
 
-def build_prompt_from_patchset_and_rules(patch_set: PatchSet, rules_text: str) -> str:
+def build_prompt_from_patchset_and_rules(
+    patch_set: PatchSet,
+    rules_text: str,
+    pr_body: str
+) -> str:
     patch_summary = []
     for patched_file in patch_set:
         patch_summary.append(f"File: {patched_file.path}")
@@ -285,6 +291,7 @@ def build_prompt_from_patchset_and_rules(patch_set: PatchSet, rules_text: str) -
     patch_text = "\n".join(patch_summary)
     prompt = (
         f"## Coding Rules:\n{rules_text}\n\n"
+        f"## PR Body:\n{pr_body}\n\n"
         f"## Patch Diff:\n{patch_text}\n\n"
         f"Please review the code changes above according to the coding rules."
     )
