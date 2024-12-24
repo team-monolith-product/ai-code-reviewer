@@ -14,3 +14,6 @@ inputs:
   OPENAI_API_KEY:
     description: "OpenAI API key for ChatGPT(O1)."
     required: true
+  PR_NUMBER:
+    description: "Pull Request number."
+    required: true
