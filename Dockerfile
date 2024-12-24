@@ -15,4 +15,4 @@ COPY entrypoint.sh .
 
 RUN chmod +x entrypoint.sh ai_code_review.py
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
