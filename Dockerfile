@@ -15,4 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ai_code_review.py .
 
 RUN chmod +x ai_code_review.py
-CMD ["python", "ai_code_review.py"]
+CMD ["python", "/app/ai_code_review.py"]
