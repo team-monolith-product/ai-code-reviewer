@@ -51,10 +51,11 @@ def main() -> None:
     g = get_github_client(github_token)        # -> Github
     pr = get_pull_request(g, repo_name, pr_number)  # -> PullRequest
 
-    # 1-1) 이미 'COMMENTED' 또는 'CHANGES_REQUESTED' 리뷰가 있는지 확인
-    if user_already_commented_or_requested_changes(g, pr):
-        print("[SKIP] 이미 리뷰가 완료되어 새 리뷰를 남기지 않고 종료합니다.")
-        return
+    # 1-1) 리뷰 요청을 받지 않았고, 이미 리뷰를 남겼다면 종료
+    if not user_requested_for_review(g, pr):
+        if user_already_commented_or_requested_changes(g, pr):
+            print("[SKIP] 이미 리뷰가 완료되어 새 리뷰를 남기지 않고 종료합니다.")
+            return
 
     # 2) PullRequest의 파일별 patch를 모아서 unidiff PatchSet 생성
     patch_set = get_diff_patchset(pr)          # -> PatchSet
@@ -107,6 +108,33 @@ def get_pull_request(g: Github, repo_name: str, pr_number: int) -> PullRequest:
     repo = g.get_repo(repo_name)
     return repo.get_pull(pr_number)
 
+def user_requested_for_review(
+    g: Github,
+    pr: PullRequest
+) -> bool:
+    """
+    현재 유저(봇 계정)가 PR의 리뷰 요청 대상자인지 확인.
+    즉, re-request가 들어온 상태인지 확인.
+
+    Returns:
+        bool: True면 "현재 유저에게 리뷰가 요청된 상태"
+    """
+    current_user_login = g.get_user().login
+    requested_reviewers, requested_teams = pr.get_review_requests()
+
+    # 개인 계정 요청 목록에 포함되어 있다면
+    if any(r.login == current_user_login for r in requested_reviewers):
+        return True
+
+    # 팀 단위 요청(teams)에 속해있는지도 확인이 필요할 수 있으나,
+    # 일반적으로 봇 계정은 팀으로 구성되지 않는 경우가 많으므로 생략.
+    # 필요 시 아래와 같이 팀 단위까지 확인 가능.
+    #
+    # for team in requested_teams:
+    #     # team.members 와 current_user_login 비교 (별도 API 필요)
+    #     pass
+
+    return False
 
 def user_already_commented_or_requested_changes(
     g: Github,
