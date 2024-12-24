@@ -17,3 +17,6 @@ inputs:
   PR_NUMBER:
     description: "Pull Request number."
     required: true
+  SYSTEM_PROMPT:
+    description: "System prompt for ChatGPT(O1)."
+    required: false

@@ -55,11 +55,13 @@ def main() -> None:
     github_token = os.getenv("GITHUB_TOKEN")
     repo_name = os.getenv("GITHUB_REPOSITORY")  # "owner/repo"
     pr_number_str = os.getenv("PR_NUMBER")      # e.g. "123"
+    # e.g. "Always answer in Korean."
+    system_prompt = os.getenv("SYSTEM_PROMPT")
 
-    if not github_token or not repo_name or not pr_number_str:
+    if not github_token or not repo_name or not pr_number_str or not system_prompt:
         raise EnvironmentError(
             "Missing one or more required environment variables: "
-            "GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER."
+            "GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, SYSTEM_PROMPT."
         )
 
     pr_number = int(pr_number_str)
@@ -78,6 +80,7 @@ def main() -> None:
     comments = get_chatgpt_review(
         patch_set=patch_set,
         rules_text=rules_text,
+        system_prompt=system_prompt
     )                                          # -> OpenAIObject or dict
 
     # 5) GitHub PR에 코멘트 등록
@@ -144,12 +147,14 @@ def load_coding_rules() -> str:
     if os.path.exists(rules_path):
         with open(rules_path, "r", encoding="utf-8") as f:
             return f.read()
-    raise FileNotFoundError(f"Could not find coding rules file at: {rules_path}")
+    raise FileNotFoundError(
+        f"Could not find coding rules file at: {rules_path}")
 
 
 def get_chatgpt_review(
     patch_set: PatchSet,
-    rules_text: str
+    rules_text: str,
+    system_prompt: str
 ) -> List[Dict[str, Any]]:
     """
     Send patch info + coding rules to ChatGPT(O1) (via openai) and return raw response.
@@ -175,7 +180,7 @@ def get_chatgpt_review(
                 "role": "system",
                 "content": (
                     "You are a code reviewer. Given the patch (diff) and the coding rules, "
-                    "review the changes and suggest improvements or highlight issues."
+                    "review the changes and suggest improvements or highlight issues." + system_prompt
                 )
             },
             {
@@ -250,6 +255,7 @@ def build_prompt_from_patchset_and_rules(patch_set: PatchSet, rules_text: str) -
         f"Please review the code changes above according to the coding rules."
     )
     return prompt
+
 
 def post_comments_to_pr(pr: PullRequest, comments: List[Dict[str, Any]]) -> None:
     """
