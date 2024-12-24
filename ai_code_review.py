@@ -219,8 +219,12 @@ def get_chatgpt_review(
             {
                 "role": "system",
                 "content": (
-                    "You are a code reviewer. Given the patch (diff) and the coding rules, "
-                    "review the changes and suggest improvements or highlight issues." + system_prompt
+                    "You are a code reviewer. "
+                    "Follow these guidelines for a great review:\n"
+                    "- Review the code changes according to the coding rules.\n"
+                    "- Suggest a better data structure, algorithm or strategy\n"
+                    "- Verify the implementation satisfies requirements\n"
+                    "- Find bugs and inconsistencies\n" + system_prompt
                 )
             },
             {
