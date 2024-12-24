@@ -26,6 +26,7 @@ GitHub Actions 환경 변수(GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, OPENAI_
 
 import os
 from typing import List, Dict, Any
+import json
 
 # (1) PyGithub 관련
 from github import Github
@@ -36,7 +37,9 @@ from unidiff import PatchSet
 
 # (3) openai 관련
 import openai
+from openai import OpenAI
 from openai.types.chat.chat_completion import ChatCompletion
+
 
 def main() -> None:
     """
@@ -73,19 +76,12 @@ def main() -> None:
     rules_text = load_coding_rules()           # -> str
 
     # 4) ChatGPT(O1) API 호출 → 코드 리뷰 결과 획득
-    review_response = get_chatgpt_review(
+    comments = get_chatgpt_review(
         patch_set=patch_set,
         rules_text=rules_text,
-        openai_api_key=openai_api_key
     )                                          # -> OpenAIObject or dict
 
-    # 5) AI 응답을 바탕으로, PR In-line 코멘트(파일 경로, 라인 번호, 내용) 생성
-    comments = make_comments_from_response(
-        patch_set=patch_set,
-        review_response=review_response
-    )                                          # -> List[Dict[str, Any]]
-
-    # 6) GitHub PR에 코멘트 등록
+    # 5) GitHub PR에 코멘트 등록
     post_comments_to_pr(pr, comments)
 
 
@@ -99,8 +95,7 @@ def get_github_client(token: str) -> Github:
     Returns:
         Github: PyGithub client instance
     """
-    # TODO: return Github(token)
-    pass
+    return Github(token)
 
 
 def get_pull_request(g: Github, repo_name: str, pr_number: int) -> PullRequest:
@@ -115,10 +110,8 @@ def get_pull_request(g: Github, repo_name: str, pr_number: int) -> PullRequest:
     Returns:
         PullRequest: The PullRequest object from PyGithub.
     """
-    # TODO:
-    # repo = g.get_repo(repo_name)
-    # return repo.get_pull(pr_number)
-    pass
+    repo = g.get_repo(repo_name)
+    return repo.get_pull(pr_number)
 
 
 def get_diff_patchset(pr: PullRequest) -> PatchSet:
@@ -131,17 +124,14 @@ def get_diff_patchset(pr: PullRequest) -> PatchSet:
     Returns:
         PatchSet: Combined patch set for the entire PR.
     """
-    # TODO:
-    # files = pr.get_files()  # Each is PullRequestFile
-    # patch_text = ""
-    # for f in files:
-    #    if f.patch:
-    #       patch_text += f"diff --git a/{f.filename} b/{f.filename}\n"
-    #       patch_text += f.patch + "\n"
-    #
-    # patch_set = PatchSet(patch_text)
-    # return patch_set
-    pass
+    patch_text = ""
+    files = pr.get_files()  # Each is PullRequestFile
+    for f in files:
+        if f.patch:
+            # unidiff 파싱을 위해 'diff --git' 헤더가 있어야 하는 경우가 종종 있습니다.
+            patch_text += f"diff --git a/{f.filename} b/{f.filename}\n"
+            patch_text += f.patch + "\n"
+    return PatchSet(patch_text)
 
 
 def load_coding_rules() -> str:
@@ -151,15 +141,17 @@ def load_coding_rules() -> str:
     Returns:
         str: The entire text of the coding rules.
     """
-    # TODO: e.g. open(".github/coding-rules.md").read()
-    pass
+    rules_path = ".github/coding-rules.md"
+    if os.path.exists(rules_path):
+        with open(rules_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "No specific coding rules found. Please define coding-rules.md if needed."
 
 
 def get_chatgpt_review(
     patch_set: PatchSet,
-    rules_text: str,
-    openai_api_key: str
-) -> ChatCompletion:
+    rules_text: str
+) -> List[Dict[str, Any]]:
     """
     Send patch info + coding rules to ChatGPT(O1) (via openai) and return raw response.
 
@@ -171,39 +163,95 @@ def get_chatgpt_review(
     Returns:
         ChatCompletion: The model's response object, typically from openai.ChatCompletion.create().
     """
-    # TODO:
-    # openai.api_key = openai_api_key
-    # prompt = build_prompt_from_patchset_and_rules(patch_set, rules_text)
-    # response = openai.ChatCompletion.create(...)
-    # return response
-    pass
+    client = OpenAI()
+
+    # 1) 프롬프트 생성
+    prompt = build_prompt_from_patchset_and_rules(patch_set, rules_text)
+
+    # 2) ChatCompletion 호출
+    # 모델 선택은 예시이므로, 필요한 모델로 수정 가능(gpt-3.5-turbo, gpt-4 등)
+    response = client.chat.completions.create(
+        model="o1",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a code reviewer. Given the patch (diff) and the coding rules, "
+                    "review the changes and suggest improvements or highlight issues."
+                )
+            },
+            {
+                "role": "user",
+                "content": prompt
+            },
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "AIReviewComments",
+                "strict": False,
+                "schema": SCHEMA
+            }
+        }
+    )
+    return json.loads(response.choices[0].message.content)['comments']
 
 
-def make_comments_from_response(
-    patch_set: PatchSet,
-    review_response: Any
-) -> List[Dict[str, Any]]:
+SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "AIReviewComments",
+    "type": "object",
+    "properties": {
+        "comments": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "해당 코멘트가 달릴 파일의 경로"
+                    },
+                    "line": {
+                        "type": "integer",
+                        "description": "파일 내 라인 번호"
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "코멘트 내용"
+                    }
+                },
+                "required": ["path", "line", "body"]
+            },
+        }
+    },
+    "required": []
+}
+
+
+def build_prompt_from_patchset_and_rules(patch_set: PatchSet, rules_text: str) -> str:
     """
-    Convert the ChatGPT(O1) response into a list of comment dictionaries suitable for GitHub.
-
-    Args:
-        patch_set (PatchSet): unidiff PatchSet for reference (files/lines).
-        review_response (Any): The AI's response, either an OpenAIObject or dict.
-
-    Returns:
-        List[Dict[str, Any]]: Each dict should have keys:
-          {
-            "path": str,
-            "line": int,
-            "body": str
-          }
+    단순한 예시 프롬프트 생성기.
+    실제로는 Diff가 매우 클 수 있으므로, 토큰 한계에 맞춰 잘라내거나 요약하는 로직이 필요할 수 있습니다.
     """
-    # TODO:
-    # - Parse the AI's text or JSON response
-    # - Possibly interpret "Line 123 in file X: ..." → map to PatchSet
-    # - Return a list of comment dicts
-    pass
+    patch_summary = []
+    for patched_file in patch_set:
+        patch_summary.append(f"File: {patched_file.path}")
+        for hunk in patched_file:
+            for line in hunk:
+                if line.is_added:
+                    patch_summary.append(
+                        f"Line{line.target_line_no}+ : {line.value.strip()}")
+                elif line.is_removed:
+                    patch_summary.append(
+                        f"Line{line.source_line_no}- : {line.value.strip()}")
 
+    patch_text = "\n".join(patch_summary)
+    prompt = (
+        f"## Coding Rules:\n{rules_text}\n\n"
+        f"## Patch Diff:\n{patch_text}\n\n"
+        f"Please review the code changes above according to the coding rules."
+    )
+    return prompt
 
 def post_comments_to_pr(pr: PullRequest, comments: List[Dict[str, Any]]) -> None:
     """
@@ -221,16 +269,14 @@ def post_comments_to_pr(pr: PullRequest, comments: List[Dict[str, Any]]) -> None
     Returns:
         None
     """
-    # TODO:
-    # commit_id = pr.head.sha
-    # for c in comments:
-    #     pr.create_review_comment(
-    #         body=c["body"],
-    #         commit_id=commit_id,
-    #         path=c["path"],
-    #         line=c["line"]
-    #     )
-    pass
+    commit = pr.get_commits().reversed[0]
+    for c in comments:
+        pr.create_review_comment(
+            body=c["body"],
+            commit=commit,
+            path=c["path"],
+            line=c["line"]
+        )
 
 
 if __name__ == "__main__":

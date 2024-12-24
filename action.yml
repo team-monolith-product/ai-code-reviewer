@@ -1,0 +1,16 @@
+# action.yml
+name: "AI Code Reviewer"
+description: "Use ChatGPT(O1) to review Pull Requests automatically."
+author: "ChangHwan Lee"
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  
+# 이 액션을 쓸 때 세팅해야 할 input 파라미터
+inputs:
+  GITHUB_TOKEN:
+    description: "GitHub token for API calls."
+    required: true
+  OPENAI_API_KEY:
+    description: "OpenAI API key for ChatGPT(O1)."
+    required: true
