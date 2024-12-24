@@ -142,8 +142,7 @@ def user_already_commented_or_requested_changes(
         if review.user.login != current_user_login:
             continue
 
-        if review.state in ["APPROVED", "COMMENTED", "CHANGES_REQUESTED"]:
-            return True
+        return review.state in ["APPROVED", "COMMENTED", "CHANGES_REQUESTED"]
     return False
 
 
