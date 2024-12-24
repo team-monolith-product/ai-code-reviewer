@@ -47,7 +47,7 @@ This GitHub Action automatically performs a code review for incoming Pull Reques
         pull-requests: write
 
     jobs:
-        ai-code-reviwer:
+        ai-code-reviewer:
             name: ai-code-reviewer
             runs-on: ubuntu-latest
             steps:
