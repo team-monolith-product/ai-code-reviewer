@@ -224,7 +224,8 @@ def get_chatgpt_review(
                     "- Review the code changes according to the coding rules.\n"
                     "- Suggest a better data structure, algorithm or strategy\n"
                     "- Verify the implementation satisfies requirements\n"
-                    "- Find bugs and inconsistencies\n" + system_prompt
+                    "- Find bugs and inconsistencies\n"
+                    "If you want to approve the review, leave no comments.\n" + system_prompt
                 )
             },
             {
