@@ -180,12 +180,11 @@ def get_patchset_from_pr(pr: PullRequest) -> PatchSet:
 
 def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
     """
-    'git diff --unified={context_lines} base_sha head_sha' 명령어를 실행해
+    'git diff --unified={context_lines} {base_ref}' 명령어를 실행해
     unified diff를 얻은 뒤, unidiff 라이브러리로 PatchSet 객체를 만들어 반환한다.
 
     Args:
-        base_sha (str): 비교 기준이 될 커밋 (예: PR의 base)
-        head_sha (str): 비교 대상 커밋 (예: PR의 head)
+        pr (PullRequest): The pull request object.
         context_lines (int): diff 생성 시 포함할 context 줄 수(기본 3줄)
 
     Returns:
@@ -196,7 +195,7 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
         "--no-pager",
         "diff",
         f"--unified={context_lines}",
-        pr.base.sha,
+        pr.base.ref,
     ]
     result = subprocess.run(
         cmd,
