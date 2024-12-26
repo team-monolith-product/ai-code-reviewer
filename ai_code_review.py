@@ -193,8 +193,8 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
     """
     cmd = [
         "git",
-        "diff",
         "--no-pager",
+        "diff",
         f"--unified={context_lines}",
         pr.base.sha,
     ]
