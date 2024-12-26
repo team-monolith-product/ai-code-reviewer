@@ -68,7 +68,7 @@ def main() -> None:
         patch_set=patch_set,
         rules_text=rules_text,
         system_prompt=system_prompt,
-        pr_body=pr.body
+        pr=pr
     )
 
     # 4-1) 코멘트가 없으면 Approve
@@ -195,7 +195,7 @@ def get_chatgpt_review(
     patch_set: PatchSet,
     rules_text: str,
     system_prompt: str,
-    pr_body: str
+    pr: PullRequest
 ) -> List[Dict[str, Any]]:
     """
     Send patch info + coding rules to ChatGPT(O1) (via openai) and return raw response.
@@ -210,7 +210,8 @@ def get_chatgpt_review(
     client = OpenAI()
 
     # 1) 프롬프트 생성
-    prompt = build_prompt_from_patchset_and_rules(patch_set, rules_text, pr_body)
+    prompt = build_prompt_from_patchset_and_rules(patch_set, rules_text, pr)
+    print(f"Prompt: {prompt}")
 
     # 2) ChatCompletion 호출
     response = client.chat.completions.create(
@@ -279,24 +280,37 @@ SCHEMA = {
 def build_prompt_from_patchset_and_rules(
     patch_set: PatchSet,
     rules_text: str,
-    pr_body: str
+    pr: PullRequest,
+    max_diff_lines: int = 1000
 ) -> str:
     patch_summary = []
     for patched_file in patch_set:
         patch_summary.append(f"File: {patched_file.path}")
         for hunk in patched_file:
+            if len(hunk) > max_diff_lines:
+                print(f"[WARN] Hunk too long for {patched_file.path}")
+                patch_summary.append("Diff: [Too Long]")
+                continue
+
             for line in hunk:
                 if line.is_added:
                     patch_summary.append(
-                        f"Line{line.target_line_no}+ : {line.value.strip()}")
+                        f"L{line.target_line_no}+ : {line.value.rstrip()}"
+                    )
                 elif line.is_removed:
                     patch_summary.append(
-                        f"Line{line.source_line_no}- : {line.value.strip()}")
+                        f"L{line.source_line_no}- : {line.value.rstrip()}"
+                    )
+                else:
+                    patch_summary.append(
+                        f"L{line.source_line_no} : {line.value.rstrip()}"
+                    )
 
     patch_text = "\n".join(patch_summary)
     prompt = (
         f"## Coding Rules:\n{rules_text}\n\n"
-        f"## PR Body:\n{pr_body}\n\n"
+        f"## PR Title:\n{pr.title}\n\n"
+        f"## PR Body:\n{pr.body}\n\n"
         f"## Patch Diff:\n{patch_text}\n\n"
         f"Please review the code changes above according to the coding rules."
     )
