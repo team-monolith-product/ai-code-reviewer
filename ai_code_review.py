@@ -195,7 +195,7 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
         "--no-pager",
         "diff",
         f"--unified={context_lines}",
-        pr.base.ref,
+        "HEAD^1",
     ]
     result = subprocess.run(
         cmd,
