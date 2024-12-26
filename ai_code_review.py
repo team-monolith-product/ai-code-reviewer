@@ -198,6 +198,15 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
         "HEAD^1",
     ]
     result = subprocess.run(
+        ['ls', '-al'],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd="/github/workspace"
+    )
+    print(result.stdout)
+
+    result = subprocess.run(
         ['git', 'status'],
         capture_output=True,
         text=True,
@@ -206,9 +215,10 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"Failed to run git diff. Return code: {result.returncode}\n"
+            f"Failed to run git status. Return code: {result.returncode}\n"
             f"stderr: {result.stderr}"
         )
+    print(result.stdout)
 
     result = subprocess.run(
         cmd,
