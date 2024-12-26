@@ -193,6 +193,10 @@ def get_patchset_from_git(context_lines: int = 3) -> PatchSet:
     Returns:
         PatchSet: unidiff로 파싱된 diff 정보를 담은 PatchSet 객체
     """
+    # GHA에서는 1001 사용자로 checkout 해주지만
+    # Docker 사용자는 root 로 하길 권장합니다.
+    # 따라서 safe.directory 설정이 필요합니다.
+    # 그렇지 않으면 get diff 에서 not a git repository 에러가 발생합니다.
     result = subprocess.run(
         [
             'git',
@@ -327,9 +331,14 @@ SCHEMA = {
                     "body": {
                         "type": "string",
                         "description": "코멘트 내용"
+                    },
+                    "side": {
+                        "type": "string",
+                        "enum": ["LEFT", "RIGHT"],
+                        "description": "코멘트가 달릴 위치 (LEFT: 삭제된 라인, RIGHT: 추가된 라인)"
                     }
                 },
-                "required": ["path", "line", "body"]
+                "required": ["path", "line", "body", "side"]
             },
         }
     },
@@ -387,7 +396,8 @@ def post_comments_to_pr(pr: PullRequest, comments: List[Dict[str, Any]]) -> None
             {
               "path": str,
               "line": int,
-              "body": str
+              "body": str,
+              "side": str
             }
 
     Returns:
@@ -399,7 +409,8 @@ def post_comments_to_pr(pr: PullRequest, comments: List[Dict[str, Any]]) -> None
             body=c["body"],
             commit=commit,
             path=c["path"],
-            line=c["line"]
+            line=c["line"],
+            side=c["side"]
         )
 
 
