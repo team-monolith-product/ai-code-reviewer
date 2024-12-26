@@ -60,8 +60,7 @@ def main() -> None:
             return
 
     # 2) PullRequest의 파일별 patch를 모아서 unidiff PatchSet 생성
-    # patch_set = get_patchset_from_pr(pr)
-    patch_set = get_patchset_from_git(10)
+    patch_set = get_patchset_from_git(pr, 10)
 
     # 3) 코딩 규칙 로드
     rules_text = load_coding_rules()
@@ -160,28 +159,10 @@ def user_already_commented_or_requested_changes(
         return review.state in ["APPROVED", "COMMENTED", "CHANGES_REQUESTED"]
     return False
 
-
-def get_patchset_from_pr(pr: PullRequest) -> PatchSet:
-    """
-    From a PullRequest, gather each file's 'patch' text and parse via unidiff.
-
-    Args:
-        pr (PullRequest): The pull request object.
-
-    Returns:
-        PatchSet: Combined patch set for the entire PR.
-    """
-    patch_text = ""
-    files = pr.get_files()  # Each is PullRequestFile
-    for f in files:
-        if f.patch:
-            # unidiff 파싱을 위해 'diff --git' 헤더가 있어야 하는 경우가 종종 있습니다.
-            patch_text += f"diff --git a/{f.filename} b/{f.filename}\n"
-            patch_text += f.patch + "\n"
-    return PatchSet(patch_text)
-
-
-def get_patchset_from_git(context_lines: int = 3) -> PatchSet:
+def get_patchset_from_git(
+    pr: PullRequest,
+    context_lines: int = 3
+) -> PatchSet:
     """
     'git diff --unified={context_lines} {base_ref}' 명령어를 실행해
     unified diff를 얻은 뒤, unidiff 라이브러리로 PatchSet 객체를 만들어 반환한다.
@@ -222,7 +203,7 @@ def get_patchset_from_git(context_lines: int = 3) -> PatchSet:
             "--no-pager",
             "diff",
             f"--unified={context_lines}",
-            "HEAD^1",
+            pr.base.ref,
         ],
         capture_output=True,
         text=True,
