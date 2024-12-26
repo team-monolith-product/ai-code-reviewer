@@ -10,9 +10,10 @@
 4) 결과를 GitHub Pull Request 코멘트(Inline Comment)로 게시하는 것을 목표로 한다.
 """
 
-import os
-from typing import List, Dict, Any
 import json
+import os
+import subprocess
+from typing import List, Dict, Any
 
 from github import Github
 from github.PullRequest import PullRequest
@@ -58,10 +59,14 @@ def main() -> None:
             return
 
     # 2) PullRequest의 파일별 patch를 모아서 unidiff PatchSet 생성
-    patch_set = get_diff_patchset(pr)          # -> PatchSet
+    # patch_set = get_patchset_from_pr(pr)
+
+    base_sha = pr.base.sha
+    head_sha = pr.head.sha
+    patch_set = get_patchset_from_git(base_sha, head_sha, 10)
 
     # 3) 코딩 규칙 로드
-    rules_text = load_coding_rules()           # -> str
+    rules_text = load_coding_rules()
 
     # 4) ChatGPT(O1) API 호출 → 코드 리뷰 결과 획득
     comments = get_chatgpt_review(
@@ -156,7 +161,7 @@ def user_already_commented_or_requested_changes(
     return False
 
 
-def get_diff_patchset(pr: PullRequest) -> PatchSet:
+def get_patchset_from_pr(pr: PullRequest) -> PatchSet:
     """
     From a PullRequest, gather each file's 'patch' text and parse via unidiff.
 
@@ -174,6 +179,43 @@ def get_diff_patchset(pr: PullRequest) -> PatchSet:
             patch_text += f"diff --git a/{f.filename} b/{f.filename}\n"
             patch_text += f.patch + "\n"
     return PatchSet(patch_text)
+
+
+def get_patchset_from_git(base_sha: str, head_sha: str, context_lines: int = 3) -> PatchSet:
+    """
+    'git diff --unified={context_lines} base_sha head_sha' 명령어를 실행해
+    unified diff를 얻은 뒤, unidiff 라이브러리로 PatchSet 객체를 만들어 반환한다.
+
+    Args:
+        base_sha (str): 비교 기준이 될 커밋 (예: PR의 base)
+        head_sha (str): 비교 대상 커밋 (예: PR의 head)
+        context_lines (int): diff 생성 시 포함할 context 줄 수(기본 3줄)
+
+    Returns:
+        PatchSet: unidiff로 파싱된 diff 정보를 담은 PatchSet 객체
+    """
+    cmd = [
+        "git",
+        "diff",
+        f"--unified={context_lines}",
+        base_sha,
+        head_sha
+    ]
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd="/github/workspace"
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to run git diff. Return code: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    diff_text = result.stdout
+    return PatchSet(diff_text)
 
 
 def load_coding_rules() -> str:
