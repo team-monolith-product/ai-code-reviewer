@@ -203,7 +203,7 @@ def get_patchset_from_git(
             "--no-pager",
             "diff",
             f"--unified={context_lines}",
-            pr.base.ref,
+            f"origin/{pr.base.ref}",
         ],
         capture_output=True,
         text=True,
