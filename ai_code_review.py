@@ -204,7 +204,11 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
         check=False,
         cwd="/github/workspace"
     )
-    print(result.stdout)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to run git diff. Return code: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
 
     result = subprocess.run(
         cmd,
