@@ -201,8 +201,7 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
         cmd,
         capture_output=True,
         text=True,
-        check=False,
-        cwd="/github/workspace"
+        check=False
     )
     if result.returncode != 0:
         raise RuntimeError(
