@@ -214,10 +214,7 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
         cwd="/github/workspace"
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to run git status. Return code: {result.returncode}\n"
-            f"stderr: {result.stderr}"
-        )
+        print(result.stderr)
     print(result.stdout)
 
     result = subprocess.run(
