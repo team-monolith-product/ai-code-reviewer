@@ -22,6 +22,7 @@ from unidiff import PatchSet
 
 from openai import OpenAI
 
+
 def main() -> None:
     """
     Main workflow, intended to run inside a GitHub Actions container.
@@ -111,6 +112,7 @@ def get_pull_request(g: Github, repo_name: str, pr_number: int) -> PullRequest:
     repo = g.get_repo(repo_name)
     return repo.get_pull(pr_number)
 
+
 def user_requested_for_review(
     g: Github,
     pr: PullRequest
@@ -138,6 +140,7 @@ def user_requested_for_review(
     #     pass
 
     return False
+
 
 def user_already_commented_or_requested_changes(
     g: Github,
@@ -190,21 +193,24 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
     Returns:
         PatchSet: unidiff로 파싱된 diff 정보를 담은 PatchSet 객체
     """
-    cmd = [
-        "git",
-        "--no-pager",
-        "diff",
-        f"--unified={context_lines}",
-        "HEAD^1",
-    ]
     result = subprocess.run(
-        ['ls', '-al'],
+        [
+            'git',
+            'config',
+            '--global',
+            '--add',
+            'safe.directory',
+            '/github/workspace'
+        ],
         capture_output=True,
         text=True,
-        check=False,
-        cwd="/github/workspace"
+        check=False
     )
-    print(result.stdout)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to run git config. Return code: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
 
     result = subprocess.run(
         ['git', 'status'],
@@ -218,7 +224,13 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
     print(result.stdout)
 
     result = subprocess.run(
-        cmd,
+        [
+            "git",
+            "--no-pager",
+            "diff",
+            f"--unified={context_lines}",
+            "HEAD^1",
+        ],
         capture_output=True,
         text=True,
         check=False,
