@@ -198,14 +198,14 @@ def get_patchset_from_git(pr: PullRequest, context_lines: int = 3) -> PatchSet:
         "HEAD^1",
     ]
     result = subprocess.run(
-        'git status',
+        ['git', 'status'],
         capture_output=True,
         text=True,
         check=False,
         cwd="/github/workspace"
     )
     print(result.stdout)
-    
+
     result = subprocess.run(
         cmd,
         capture_output=True,
