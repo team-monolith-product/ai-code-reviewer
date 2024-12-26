@@ -34,32 +34,35 @@ This GitHub Action automatically performs a code review for incoming Pull Reques
 ## Usage
 
 1. **Create a GitHub Workflow**  
-   In your repository, create a YAML workflow file (e.g., `.github/workflows/ai-code-reviewer.yml`) with the following example content:
-   ```yaml
-    name: AI Code Reviewer
+In your repository, create a YAML workflow file (e.g., `.github/workflows/ai-code-reviewer.yml`) with the following example content:
+```yaml
+name: AI Code Reviewer
 
-    on:
-        pull_request:
-            types: [opened, synchronize, reopened]
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, review_requested]
 
-    permissions:
-        contents: write
-        pull-requests: write
+permissions:
+  contents: write
+  pull-requests: write
 
-    jobs:
-        ai-code-reviewer:
-            name: ai-code-reviewer
-            runs-on: ubuntu-latest
-            steps:
-            - uses: actions/checkout@v4
-            - name: Run ChatGPT Code Review
-                uses: team-monolith-product/ai-code-reviewer@main
-                with:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-                PR_NUMBER: ${{ github.event.number }}
-                SYSTEM_PROMPT: Always answer in Korean.
-   ```
+jobs:
+  ai-code-reviewer:
+    name: ai-code-reviewer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run ChatGPT Code Review
+        uses: team-monolith-product/ai-code-reviewer@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PR_NUMBER: ${{ github.event.number }}
+          SYSTEM_PROMPT: Always answer in Korean.
+
+```
 
 2. **Add Your Coding Rules**  
    - Create a file in your repo at `.github/coding-rules.md`.  
