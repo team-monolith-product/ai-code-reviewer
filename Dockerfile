@@ -10,9 +10,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Checkout Action이 1001로 사용자를 줍니다
-USER 1001
-
 COPY ai_code_review.py .
 COPY entrypoint.sh .
 
