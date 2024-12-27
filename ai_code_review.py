@@ -425,7 +425,8 @@ def post_comments_to_pr(pr: PullRequest, comments: List[Dict[str, Any]]) -> None
                 body=f"_AI failed to specify correct line number._\n{c['body']}",
                 commit=commit,
                 path=c["path"],
-                side=c["side"]
+                side=c["side"],
+                subject_type="file"
             )
 
 
