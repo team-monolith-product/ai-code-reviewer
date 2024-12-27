@@ -376,7 +376,11 @@ def build_prompt_from_patchset_and_rules(
         f"## Coding Rules:\n{rules_text}\n\n"
         f"## PR Title:\n{pr.title}\n\n"
         f"## PR Body:\n{pr.body}\n\n"
-        f"## Patch Diff:\n{patch_text}\n\n"
+        f"## Patch Diff:\n"
+        "_L13+ : This line was added in the PR._\n"
+        "_L13- : This line was removed in the PR._\n"
+        "_L13 : This line was unchanged in the PR._\n"
+        "{patch_text}\n\n"
         f"Please review the code changes above according to the coding rules."
     )
     return prompt
