@@ -199,7 +199,8 @@ def get_patchset_from_git(
         [
             'git',
             'fetch',
-            f"origin/{pr.base.ref}",
+            'origin',
+            pr.base.ref,
         ],
         capture_output=True,
         text=True,

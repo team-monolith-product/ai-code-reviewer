@@ -1,4 +1,3 @@
 PyGithub
 unidiff
 openai
-pytest
