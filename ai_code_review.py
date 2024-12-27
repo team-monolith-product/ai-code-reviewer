@@ -13,7 +13,7 @@ import os
 import subprocess
 from typing import List, Dict, Any
 
-from github import Github
+from github import Github, GithubException
 from github.PullRequest import PullRequest
 
 from unidiff import PatchSet
@@ -156,6 +156,7 @@ def user_already_commented_or_requested_changes(
 
         return review.state in ["APPROVED", "COMMENTED", "CHANGES_REQUESTED"]
     return False
+
 
 def get_patchset_from_git(
     pr: PullRequest,
@@ -374,18 +375,18 @@ def build_prompt_from_patchset_and_rules(
     patch_text = "\n".join(patch_summary)
     prompt = (
         f"## Coding Rules:\n{rules_text}\n\n"
-        "----\n\n",
+        "----\n\n"
         f"## PR Title:\n{pr.title}\n\n"
-        "----\n\n",
+        "----\n\n"
         f"## PR Body:\n{pr.body}\n\n"
-        "----\n\n",
+        "----\n\n"
         f"## Patch Diff:\n"
         "_L13+ : This line was added in the PR._\n"
         "_L13- : This line was removed in the PR._\n"
         "_L13 : This line was unchanged in the PR._\n"
         f"{patch_text}\n\n"
-        "----\n\n",
-        f"Please review the code changes above according to the coding rules."
+        "----\n\n"
+        "Please review the code changes above according to the coding rules."
     )
     return prompt
 
@@ -409,13 +410,23 @@ def post_comments_to_pr(pr: PullRequest, comments: List[Dict[str, Any]]) -> None
     """
     commit = pr.get_commits().reversed[0]
     for c in comments:
-        pr.create_review_comment(
-            body=c["body"],
-            commit=commit,
-            path=c["path"],
-            line=c["line"],
-            side=c["side"]
-        )
+        try:
+            pr.create_review_comment(
+                body=c["body"],
+                commit=commit,
+                path=c["path"],
+                line=c["line"],
+                side=c["side"]
+            )
+        except GithubException as e:
+            if not any(error["message"] == "pull_request_review_thread.line must be part of the diff" for error in e.data["errors"]):
+                raise
+            pr.create_review_comment(
+                body=f"_AI failed to specify correct line number._\n{c['body']}",
+                commit=commit,
+                path=c["path"],
+                side=c["side"]
+            )
 
 
 if __name__ == "__main__":
