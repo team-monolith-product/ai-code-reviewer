@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 프로젝트: GitHub PR 자동 코드 리뷰
 
@@ -199,6 +197,23 @@ def get_patchset_from_git(
 
     result = subprocess.run(
         [
+            'git',
+            'fetch',
+            f"origin/{pr.base.ref}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd="/github/workspace"
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to run git fetch. Return code: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    result = subprocess.run(
+        [
             "git",
             "--no-pager",
             "diff",
@@ -210,7 +225,6 @@ def get_patchset_from_git(
         check=False,
         cwd="/github/workspace"
     )
-
     if result.returncode != 0:
         raise RuntimeError(
             f"Failed to run git diff. Return code: {result.returncode}\n"

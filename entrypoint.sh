@@ -6,5 +6,4 @@ export OPENAI_API_KEY="$INPUT_OPENAI_API_KEY"
 export PR_NUMBER="$INPUT_PR_NUMBER"
 export SYSTEM_PROMPT="$INPUT_SYSTEM_PROMPT"
 
-# 2) 실제 Python 스크립트 실행
 python /app/ai_code_review.py

@@ -6,7 +6,6 @@ runs:
   using: "docker"
   image: "Dockerfile"
   
-# 이 액션을 쓸 때 세팅해야 할 input 파라미터
 inputs:
   GITHUB_TOKEN:
     description: "GitHub token for API calls."
