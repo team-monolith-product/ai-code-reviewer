@@ -271,7 +271,7 @@ def get_chatgpt_review(
     client = OpenAI()
 
     # 1) 프롬프트 생성
-    prompt = build_prompt_from_patchset_and_rules(patch_set, rules_text, pr)
+    prompt = build_prompt(patch_set, rules_text, pr)
     print(f"Prompt: {prompt}")
 
     # 2) ChatCompletion 호출
@@ -281,13 +281,15 @@ def get_chatgpt_review(
             {
                 "role": "system",
                 "content": (
-                    "You are a code reviewer. "
+                    "You are a code reviewer. Your goal is to raise new issues or suggestions for the code changes.\n"
                     "Follow these guidelines for a great review:\n"
                     "- Review the code changes according to the coding rules.\n"
-                    "- Suggest a better data structure, algorithm or strategy\n"
-                    "- Verify the implementation satisfies requirements\n"
-                    "- Find bugs and inconsistencies\n"
-                    "If you want to approve the review, leave no comments.\n" + system_prompt
+                    "- Suggest a better data structure, algorithm or strategy.\n"
+                    "- Verify the implementation satisfies requirements.\n"
+                    "- Find bugs and inconsistencies.\n"
+                    "- Do not make duplicated or similar comments.\n"
+                    "- Do not reply to the existing comments.\n"
+                    "If there are no new issues or suggestions, leave no comments.\n" + system_prompt
                 )
             },
             {
@@ -343,7 +345,7 @@ SCHEMA = {
 }
 
 
-def build_prompt_from_patchset_and_rules(
+def build_prompt(
     patch_set: PatchSet,
     rules_text: str,
     pr: PullRequest,
@@ -371,22 +373,50 @@ def build_prompt_from_patchset_and_rules(
                     patch_summary.append(
                         f"L{line.source_line_no} : {line.value.rstrip()}"
                     )
-
     patch_text = "\n".join(patch_summary)
+
+    comments_summary = []
+    id_to_threads = {}
+    for comment in pr.get_review_comments():
+        if comment.in_reply_to_id:
+            id_to_threads[comment.in_reply_to_id].append(comment)
+        else:
+            id_to_threads[comment.id] = [comment]
+
+    for _, threads in id_to_threads.items():
+        thread_summary = []
+        for thread in threads:
+            thread_summary.append(
+                f"From: {thread.user.name}\n"
+                f"{thread.body}\n"
+            )
+        comments_summary.append(
+            f"Thread At {threads[0].path}:L{threads[0].position}\n" +
+            "--------------\n".join(thread_summary)
+        )
+
+    comment_text = "==============\n".join(comments_summary)
+
     prompt = (
-        f"# Coding Rules:\n{rules_text}\n\n"
-        "----\n\n"
-        f"# PR Title:\n{pr.title}\n\n"
-        "----\n\n"
-        f"# PR Body:\n{pr.body}\n\n"
-        "----\n\n"
-        f"# Patch Diff:\n"
+        "<coding-rules>\n"
+        f"{rules_text}\n"
+        "</coding-rules>\n\n"
+        "<pr-title>\n"
+        f"{pr.title}\n"
+        "</pr-title>\n\n"
+        "<pr-body>\n"
+        f"{pr.body}\n"
+        "</pr-body>\n\n"
+        f"<patch-diff>\n"
         "_L13+ : This line was added in the PR._\n"
         "_L13- : This line was removed in the PR._\n"
         "_L13 : This line was unchanged in the PR._\n"
-        f"{patch_text}\n\n"
-        "----\n\n"
-        "Please review the code changes above according to the coding rules."
+        f"{patch_text}\n"
+        "</patch-diff>\n\n"
+        f"<existing-comments>\n"
+        f"{comment_text}\n"
+        "</existing-comments>\n\n"
+        "Please raise new issues or suggestions according to the coding rules."
     )
     return prompt
 
