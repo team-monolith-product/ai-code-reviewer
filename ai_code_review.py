@@ -51,7 +51,13 @@ def main() -> None:
     g = get_github_client(github_token)        # -> Github
     pr = get_pull_request(g, repo_name, pr_number)  # -> PullRequest
 
-    # 1-1) 리뷰 요청을 받지 않았고, 이미 리뷰를 남겼다면 종료
+    # 1-1) review-requested 이벤트인데, 현재 유저에게 리뷰 요청이 아니라면 종료
+    if not is_review_requested_for_current_token_user(g):
+        print("[SKIP] 이번 이벤트는 'review_requested' 이지만, "
+              "이 토큰 소유자에게 온 요청이 아님.")
+        return
+
+    # 1-2) 리뷰 요청을 받지 않았고, 이미 리뷰를 남겼다면 종료
     if not user_requested_for_review(g, pr):
         if user_already_commented_or_requested_changes(g, pr):
             print("[SKIP] 이미 리뷰가 완료되어 새 리뷰를 남기지 않고 종료합니다.")
@@ -108,6 +114,37 @@ def get_pull_request(g: Github, repo_name: str, pr_number: int) -> PullRequest:
     """
     repo = g.get_repo(repo_name)
     return repo.get_pull(pr_number)
+
+
+def is_review_requested_for_current_token_user(g: Github) -> bool:
+    """
+    1. GITHUB_EVENT_PATH에서 pull_request.review_requested 이벤트 페이로드를 파싱
+    2. 현재 토큰 유저(g.get_user().login)와 requested_reviewer.login이 같으면 True, 아니면 False
+    """
+    event_path = os.getenv("GITHUB_EVENT_PATH")
+    if not event_path or not os.path.exists(event_path):
+        # 이벤트가 없거나, 해당 파일이 없으면 False
+        return False
+
+    with open(event_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+
+    # 1) 혹시 action이 review_requested 인지 체크
+    if payload.get("action") != "review_requested":
+        return False
+
+    requested_reviewer = payload.get("requested_reviewer")
+    if not requested_reviewer:
+        # 혹은 requested_team이 있을 수도 있으나, 일반 계정 요청이면 requested_reviewer에 있음
+        return False
+
+    current_user_login = g.get_user().login  # 토큰 소유자 계정
+    requested_login = requested_reviewer.get("login")
+
+    print(f"[*] Event says review was requested for: {requested_login}")
+    print(f"[*] Current token user is: {current_user_login}")
+
+    return (requested_login == current_user_login)
 
 
 def user_requested_for_review(
