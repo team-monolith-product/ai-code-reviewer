@@ -52,9 +52,8 @@ def main() -> None:
     pr = get_pull_request(g, repo_name, pr_number)  # -> PullRequest
 
     # 1-1) review-requested 이벤트인데, 현재 유저에게 리뷰 요청이 아니라면 종료
-    if not is_review_requested_for_current_token_user(g):
-        print("[SKIP] 이번 이벤트는 'review_requested' 이지만, "
-              "이 토큰 소유자에게 온 요청이 아님.")
+    if is_review_requested_by_other_user(g):
+        print("[SKIP] review-request 이벤트가 다른 사용자에게 발생함.")
         return
 
     # 1-2) 리뷰 요청을 받지 않았고, 이미 리뷰를 남겼다면 종료
@@ -116,7 +115,7 @@ def get_pull_request(g: Github, repo_name: str, pr_number: int) -> PullRequest:
     return repo.get_pull(pr_number)
 
 
-def is_review_requested_for_current_token_user(g: Github) -> bool:
+def is_review_requested_by_other_user(g: Github) -> bool:
     """
     1. GITHUB_EVENT_PATH에서 pull_request.review_requested 이벤트 페이로드를 파싱
     2. 현재 토큰 유저(g.get_user().login)와 requested_reviewer.login이 같으면 True, 아니면 False
@@ -144,7 +143,7 @@ def is_review_requested_for_current_token_user(g: Github) -> bool:
     print(f"[*] Event says review was requested for: {requested_login}")
     print(f"[*] Current token user is: {current_user_login}")
 
-    return (requested_login == current_user_login)
+    return (requested_login != current_user_login)
 
 
 def user_requested_for_review(
