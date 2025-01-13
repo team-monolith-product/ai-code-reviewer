@@ -54,6 +54,7 @@ def main() -> None:
     # 1-1) 리뷰 요청을 받지 않았다면 종료
     if not user_requested_for_review(g, pr):
         print("[SKIP] 리뷰가 요청되지 않아 종료합니다.")
+        return
 
     # 2) PullRequest의 파일별 patch를 모아서 unidiff PatchSet 생성
     patch_set = get_patchset_from_git(pr, 10)
