@@ -325,30 +325,34 @@ def build_prompt(
     patch_set: PatchSet,
     rules_text: str,
     pr: PullRequest,
-    max_diff_lines: int = 1000
+    max_diff_bytes: int = 10 * 1024  # 기본 10KB 제한, 필요에 따라 조정 가능
 ) -> str:
     patch_summary = []
     for patched_file in patch_set:
         patch_summary.append(f"File: {patched_file.path}")
+        file_diff_lines = []
+        # 각 파일의 모든 hunk의 라인 정보를 모아서 하나의 문자열로 생성
         for hunk in patched_file:
-            if len(hunk) > max_diff_lines:
-                print(f"[WARN] Hunk too long for {patched_file.path}")
-                patch_summary.append("Diff: [Too Long]")
-                continue
-
             for line in hunk:
                 if line.is_added:
-                    patch_summary.append(
+                    file_diff_lines.append(
                         f"L{line.target_line_no}+ : {line.value.rstrip()}"
                     )
                 elif line.is_removed:
-                    patch_summary.append(
+                    file_diff_lines.append(
                         f"L{line.source_line_no}- : {line.value.rstrip()}"
                     )
                 else:
-                    patch_summary.append(
+                    file_diff_lines.append(
                         f"L{line.source_line_no} : {line.value.rstrip()}"
                     )
+        file_diff_text = "\n".join(file_diff_lines)
+        # utf-8 인코딩 바이트 수 기준으로 크기 체크
+        if len(file_diff_text.encode("utf-8")) > max_diff_bytes:
+            print(f"[WARN] Diff too large for {patched_file.path}")
+            patch_summary.append("Diff: [Too Long]")
+        else:
+            patch_summary.append(file_diff_text)
     patch_text = "\n".join(patch_summary)
 
     comments_summary = []
