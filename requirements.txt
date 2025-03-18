@@ -1,3 +1,6 @@
 PyGithub
 unidiff
 openai
+
+langchain-openai
+langgraph
