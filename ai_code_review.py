@@ -11,13 +11,11 @@ import argparse
 import os
 import subprocess
 import tempfile
-from typing import Literal
 
 from dotenv import load_dotenv
 from github import Github, GithubException
 from github.PullRequest import PullRequest
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 
 from unidiff import PatchSet
@@ -310,7 +308,7 @@ def get_chatgpt_review(
     rules_text: str,
     system_prompt: str,
     pr: PullRequest
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, any]]:
     """
     Send patch info + coding rules to ChatGPT(O3) (via openai) and return raw response.
 
@@ -361,6 +359,40 @@ def get_chatgpt_review(
 
     return json.loads(response.content)["comments"]
 
+SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "AIReviewComments",
+    "type": "object",
+    "properties": {
+        "comments": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "해당 코멘트가 달릴 파일의 경로"
+                    },
+                    "line": {
+                        "type": "integer",
+                        "description": "파일 내 라인 번호"
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "코멘트 내용"
+                    },
+                    "side": {
+                        "type": "string",
+                        "enum": ["LEFT", "RIGHT"],
+                        "description": "코멘트가 달릴 위치 (LEFT: 삭제된 라인, RIGHT: 추가된 라인)"
+                    }
+                },
+                "required": ["path", "line", "body", "side"]
+            },
+        }
+    },
+    "required": []
+}
 
 def build_prompt(
     patch_set: PatchSet,
@@ -441,7 +473,7 @@ def build_prompt(
     )
     return prompt
 
-def post_comments_to_pr(pr: PullRequest, comments: List[Dict[str, Any]]) -> None:
+def post_comments_to_pr(pr: PullRequest, comments: list[dict[str, any]]) -> None:
     """
     Post the AI-generated comments to the specified PR using PyGithub's review comment API.
     Args:
