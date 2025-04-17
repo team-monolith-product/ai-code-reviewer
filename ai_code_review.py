@@ -252,7 +252,7 @@ def get_chatgpt_review(
 
     # 2) ChatCompletion 호출
     response = client.chat.completions.create(
-        model="o1",
+        model="o3",
         messages=[
             {
                 "role": "system",
