@@ -1,5 +1,3 @@
 PyGithub
 unidiff
-openai
-
 langchain-openai
