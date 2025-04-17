@@ -11,6 +11,7 @@ import argparse
 import os
 import subprocess
 import tempfile
+import json
 
 from dotenv import load_dotenv
 from github import Github, GithubException
@@ -321,13 +322,16 @@ def get_chatgpt_review(
     """
     llm = ChatOpenAI(
         model="o3",
-        temperature=0,
-        openai_api_kwargs={
+        # o3 에 대한 특수 정책:
+        # temperature does not support 0.7 with this model.
+        # Only the default (1) value is supported.
+        temperature=1,
+        model_kwargs={
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
                     "name": "AIReviewComments",
-                    "strict": False,
+                    "strict": True,
                     "schema": SCHEMA,
                 },
             }
@@ -387,11 +391,13 @@ SCHEMA = {
                         "description": "코멘트가 달릴 위치 (LEFT: 삭제된 라인, RIGHT: 추가된 라인)"
                     }
                 },
+                "additionalProperties": False,
                 "required": ["path", "line", "body", "side"]
             },
         }
     },
-    "required": []
+    "additionalProperties": False,
+    "required": ["comments"]
 }
 
 def build_prompt(
