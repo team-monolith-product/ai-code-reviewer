@@ -9,6 +9,7 @@
 """
 
 import argparse
+import datetime
 import os
 import subprocess
 import tempfile
@@ -312,10 +313,13 @@ def get_chatgpt_review(
     prompt = build_prompt(patch_set, rules_text, pr)
     print(f"Prompt: {prompt}")
 
+    current_time = datetime.datetime.now().strftime("%B %d, %Y")
+
     response = llm.invoke(
         [
             SystemMessage(
                 content=(
+                    f"Today's date is {current_time}.\n"
                     "You are a code reviewer. Your goal is to raise new issues or "
                     "suggestions for the code changes.\n"
                     "- Review the code changes according to the coding rules.\n"
