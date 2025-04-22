@@ -7,6 +7,7 @@
 3) ChatGPT(O1) 모델을 이용하여 자동 리뷰를 수행하고,
 4) 결과를 GitHub Pull Request 코멘트(Inline Comment)로 게시하는 것을 목표로 한다.
 """
+
 import argparse
 import os
 import subprocess
@@ -41,7 +42,7 @@ def main() -> None:
     # 0) Load environment variables
     github_token = os.getenv("GITHUB_TOKEN")
     repo_name = os.getenv("GITHUB_REPOSITORY")  # "owner/repo"
-    pr_number_str = os.getenv("PR_NUMBER")      # e.g. "123"
+    pr_number_str = os.getenv("PR_NUMBER")  # e.g. "123"
     # e.g. "Always answer in Korean."
     system_prompt = os.getenv("SYSTEM_PROMPT")
 
@@ -52,14 +53,17 @@ def main() -> None:
         )
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--force', action='store_true',
-                        help='리뷰 상태와 관계없이 강제로 리뷰를 수행합니다.')
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="리뷰 상태와 관계없이 강제로 리뷰를 수행합니다.",
+    )
     args = parser.parse_args()
 
     pr_number = int(pr_number_str)
 
     # 1) PyGithub로 PullRequest 가져오기
-    g = get_github_client(github_token)        # -> Github
+    g = get_github_client(github_token)  # -> Github
     pr = get_pull_request(g, repo_name, pr_number)  # -> PullRequest
 
     # 1-1) 리뷰 요청을 받지 않았다면 종료
@@ -68,10 +72,10 @@ def main() -> None:
         return
 
     # /github/workspace 경로가 존재하지 않는 경우, 로컬 환경으로 가정
-    if not os.path.exists('/github/workspace'):
+    if not os.path.exists("/github/workspace"):
         git_dir = clone_repo(pr)
     else:
-        git_dir = '/github/workspace'
+        git_dir = "/github/workspace"
 
     # 2) PullRequest의 파일별 patch를 모아서 unidiff PatchSet 생성
     patch_set = get_patchset_from_git(git_dir, pr, 10)
@@ -81,10 +85,7 @@ def main() -> None:
 
     # 4) ChatGPT(O1) API 호출 → 코드 리뷰 결과 획득
     comments = get_chatgpt_review(
-        patch_set=patch_set,
-        rules_text=rules_text,
-        system_prompt=system_prompt,
-        pr=pr
+        patch_set=patch_set, rules_text=rules_text, system_prompt=system_prompt, pr=pr
     )
 
     # 4-1) 코멘트가 없으면 Approve
@@ -97,9 +98,7 @@ def main() -> None:
     post_comments_to_pr(pr, comments)
 
 
-def clone_repo(
-    pr: PullRequest
-):
+def clone_repo(pr: PullRequest):
     """
     GHA 환경에서는 이미 대상 레포지토리가 체크아웃되어 있으므로 필요없으나,
     명령줄 환경에서 요구되는 함수입니다.
@@ -113,35 +112,23 @@ def clone_repo(
     # 1. 레포지토리 clone
     print(f"Cloning repository {repo.full_name} into {dest_dir}...")
     result = subprocess.run(
-        ["git", "clone", clone_url, dest_dir],
-        capture_output=True,
-        text=True
+        ["git", "clone", clone_url, dest_dir], capture_output=True, text=True
     )
     if result.returncode != 0:
         raise RuntimeError(f"Failed to clone repository: {result.stderr}")
 
     # 2. PR의 ref(fetch) – PR 번호에 해당하는 ref를 로컬 브랜치로 생성
-    fetch_command = ["git", "fetch", "origin",
-                     f"pull/{pr_number}/head:pr-{pr_number}"]
+    fetch_command = ["git", "fetch", "origin", f"pull/{pr_number}/head:pr-{pr_number}"]
     print(f"Fetching PR branch with command: {' '.join(fetch_command)}")
-    result = subprocess.run(
-        fetch_command,
-        cwd=dest_dir,
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(fetch_command, cwd=dest_dir, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Failed to fetch PR branch: {result.stderr}")
 
     # 3. 생성된 브랜치 체크아웃
     checkout_command = ["git", "checkout", f"pr-{pr_number}"]
-    print(
-        f"Checking out branch with command: {' '.join(checkout_command)}")
+    print(f"Checking out branch with command: {' '.join(checkout_command)}")
     result = subprocess.run(
-        checkout_command,
-        cwd=dest_dir,
-        capture_output=True,
-        text=True
+        checkout_command, cwd=dest_dir, capture_output=True, text=True
     )
     if result.returncode != 0:
         raise RuntimeError(f"Failed to checkout branch: {result.stderr}")
@@ -180,10 +167,7 @@ def get_pull_request(g: Github, repo_name: str, pr_number: int) -> PullRequest:
     return repo.get_pull(pr_number)
 
 
-def user_requested_for_review(
-    g: Github,
-    pr: PullRequest
-) -> bool:
+def user_requested_for_review(g: Github, pr: PullRequest) -> bool:
     """
     현재 유저(봇 계정)가 PR의 리뷰 요청 대상자인지 확인.
     즉, re-request가 들어온 상태인지 확인.
@@ -210,9 +194,7 @@ def user_requested_for_review(
 
 
 def get_patchset_from_git(
-    git_dir: str,
-    pr: PullRequest,
-    context_lines: int = 3
+    git_dir: str, pr: PullRequest, context_lines: int = 3
 ) -> PatchSet:
     """
     'git diff --unified={context_lines} {base_ref}' 명령어를 실행해
@@ -230,17 +212,10 @@ def get_patchset_from_git(
     # 따라서 safe.directory 설정이 필요합니다.
     # 그렇지 않으면 get diff 에서 not a git repository 에러가 발생합니다.
     result = subprocess.run(
-        [
-            'git',
-            'config',
-            '--global',
-            '--add',
-            'safe.directory',
-            git_dir
-        ],
+        ["git", "config", "--global", "--add", "safe.directory", git_dir],
         capture_output=True,
         text=True,
-        check=False
+        check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -250,15 +225,15 @@ def get_patchset_from_git(
 
     result = subprocess.run(
         [
-            'git',
-            'fetch',
-            'origin',
+            "git",
+            "fetch",
+            "origin",
             pr.base.ref,
         ],
         capture_output=True,
         text=True,
         check=False,
-        cwd=git_dir
+        cwd=git_dir,
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -277,7 +252,7 @@ def get_patchset_from_git(
         capture_output=True,
         text=True,
         check=False,
-        cwd=git_dir
+        cwd=git_dir,
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -300,15 +275,11 @@ def load_coding_rules(git_dir: str) -> str:
     if os.path.exists(rules_path):
         with open(rules_path, "r", encoding="utf-8") as f:
             return f.read()
-    raise FileNotFoundError(
-        f"Could not find coding rules file at: {rules_path}")
+    raise FileNotFoundError(f"Could not find coding rules file at: {rules_path}")
 
 
 def get_chatgpt_review(
-    patch_set: PatchSet,
-    rules_text: str,
-    system_prompt: str,
-    pr: PullRequest
+    patch_set: PatchSet, rules_text: str, system_prompt: str, pr: PullRequest
 ) -> list[dict[str, any]]:
     """
     Send patch info + coding rules to ChatGPT(O3) (via openai) and return raw response.
@@ -363,6 +334,7 @@ def get_chatgpt_review(
 
     return json.loads(response.content)["comments"]
 
+
 SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "AIReviewComments",
@@ -375,36 +347,31 @@ SCHEMA = {
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "해당 코멘트가 달릴 파일의 경로"
+                        "description": "해당 코멘트가 달릴 파일의 경로",
                     },
-                    "line": {
-                        "type": "integer",
-                        "description": "파일 내 라인 번호"
-                    },
-                    "body": {
-                        "type": "string",
-                        "description": "코멘트 내용"
-                    },
+                    "line": {"type": "integer", "description": "파일 내 라인 번호"},
+                    "body": {"type": "string", "description": "코멘트 내용"},
                     "side": {
                         "type": "string",
                         "enum": ["LEFT", "RIGHT"],
-                        "description": "코멘트가 달릴 위치 (LEFT: 삭제된 라인, RIGHT: 추가된 라인)"
-                    }
+                        "description": "코멘트가 달릴 위치 (LEFT: 삭제된 라인, RIGHT: 추가된 라인)",
+                    },
                 },
                 "additionalProperties": False,
-                "required": ["path", "line", "body", "side"]
+                "required": ["path", "line", "body", "side"],
             },
         }
     },
     "additionalProperties": False,
-    "required": ["comments"]
+    "required": ["comments"],
 }
+
 
 def build_prompt(
     patch_set: PatchSet,
     rules_text: str,
     pr: PullRequest,
-    max_diff_bytes: int = 10 * 1024  # 기본 10KB 제한, 필요에 따라 조정 가능
+    max_diff_bytes: int = 10 * 1024,  # 기본 10KB 제한, 필요에 따라 조정 가능
 ) -> str:
     patch_summary = []
     for patched_file in patch_set:
@@ -445,13 +412,10 @@ def build_prompt(
     for _, threads in id_to_threads.items():
         thread_summary = []
         for thread in threads:
-            thread_summary.append(
-                f"From: {thread.user.name}\n"
-                f"{thread.body}\n"
-            )
+            thread_summary.append(f"From: {thread.user.name}\n" f"{thread.body}\n")
         comments_summary.append(
-            f"Thread At {threads[0].path}:L{threads[0].position}\n" +
-            "--------------\n".join(thread_summary)
+            f"Thread At {threads[0].path}:L{threads[0].position}\n"
+            + "--------------\n".join(thread_summary)
         )
 
     comment_text = "==============\n".join(comments_summary)
@@ -479,6 +443,7 @@ def build_prompt(
     )
     return prompt
 
+
 def post_comments_to_pr(pr: PullRequest, comments: list[dict[str, any]]) -> None:
     """
     Post the AI-generated comments to the specified PR using PyGithub's review comment API.
@@ -502,18 +467,23 @@ def post_comments_to_pr(pr: PullRequest, comments: list[dict[str, any]]) -> None
                 commit=commit,
                 path=c["path"],
                 line=c["line"],
-                side=c["side"]
+                side=c["side"],
             )
         except GithubException as e:
-            if not any(error["message"] == "pull_request_review_thread.line must be part of the diff" for error in e.data["errors"]):
+            if not any(
+                error["message"]
+                == "pull_request_review_thread.line must be part of the diff"
+                for error in e.data["errors"]
+            ):
                 raise
             pr.create_review_comment(
                 body=f"_AI failed to specify correct line number._\n{c['body']}",
                 commit=commit,
                 path=c["path"],
                 side=c["side"],
-                subject_type="file"
+                subject_type="file",
             )
+
 
 if __name__ == "__main__":
     main()
