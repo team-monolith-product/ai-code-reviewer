@@ -417,8 +417,8 @@ def build_prompt(
     for _, threads in id_to_threads.items():
         thread_summary = []
         for thread in threads:
-            nameOrLogin = thread.user.get('name', thread.user.login)
-            thread_summary.append(f"From: {nameOrLogin}\n" f"{thread.body}\n")
+            name_or_login = thread.user.get('name', thread.user.login)
+            thread_summary.append(f"From: {name_or_login}\n" f"{thread.body}\n")
         comments_summary.append(
             f"Thread At {threads[0].path}:L{threads[0].position}\n"
             + "--------------\n".join(thread_summary)
