@@ -80,7 +80,7 @@ def main() -> None:
         git_dir = "/github/workspace"
 
     # 2) PullRequest의 파일별 patch를 모아서 unidiff PatchSet 생성
-    patch_set = get_patchset_from_git(git_dir, pr, 10)
+    patch_set = get_patchset_from_git(git_dir, pr, 30)
 
     # 3) 코딩 규칙 로드
     rules_text = load_coding_rules(git_dir)
