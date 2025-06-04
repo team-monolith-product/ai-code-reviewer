@@ -273,7 +273,7 @@ def load_coding_rules(git_dir: str) -> str:
     Returns:
         str: The entire text of the coding rules.
     """
-    rules_path = f"{git_dir}/.github/coding-rules.md"
+    rules_path = f"{git_dir}/.github/AGENTS.md"
     if os.path.exists(rules_path):
         with open(rules_path, "r", encoding="utf-8") as f:
             return f.read()
