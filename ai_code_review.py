@@ -277,7 +277,14 @@ def load_coding_rules(git_dir: str) -> str:
     if os.path.exists(rules_path):
         with open(rules_path, "r", encoding="utf-8") as f:
             return f.read()
-    raise FileNotFoundError(f"Could not find coding rules file at: {rules_path}")
+    
+    # Fallback to root AGENTS.md if .github/AGENTS.md doesn't exist
+    root_rules_path = f"{git_dir}/AGENTS.md"
+    if os.path.exists(root_rules_path):
+        with open(root_rules_path, "r", encoding="utf-8") as f:
+            return f.read()
+    
+    raise FileNotFoundError(f"Could not find coding rules file at: {rules_path} or {root_rules_path}")
 
 
 def get_chatgpt_review(
