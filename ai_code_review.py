@@ -9,20 +9,14 @@
 """
 
 import argparse
-import datetime
 import os
 import subprocess
 import tempfile
-import json
-from typing import Any
 
 from dotenv import load_dotenv
-from github import Github, GithubException
+from github import Github
 from github.PullRequest import PullRequest
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_openai import ChatOpenAI
-
-from unidiff import PatchSet
+import review_openai
 
 # 환경 변수 로드
 load_dotenv()
@@ -79,33 +73,9 @@ def main() -> None:
     else:
         git_dir = "/github/workspace"
 
-    review(pr, git_dir, system_prompt)
+    review_openai.review(pr, git_dir, system_prompt)
 
 
-def review(
-    pr: PullRequest,
-    git_dir: str,
-    system_prompt: str,
-):
-    """
-    Perform AI-based code review on the given PullRequest and post comments.
-    It posts inline comments, change requests, or approves the PR based on the review results.
-    
-    Args:
-        pr (PullRequest): The PyGithub PullRequest object to review.
-        git_dir (str): The local path to the git repository.
-        system_prompt (str): The system prompt to guide the AI model.
-    """
-    patch_set = get_patchset_from_git(git_dir, pr, 30)
-    rules_text = load_coding_rules(git_dir)
-    comments = get_chatgpt_review(
-        patch_set=patch_set, rules_text=rules_text, system_prompt=system_prompt, pr=pr
-    )
-    if not comments:
-        pr.create_review(body="LGTM :)", event="APPROVE")
-        print("[SKIP] AI 리뷰 결과 코멘트가 없어 Approve 처리했습니다.")
-        return
-    post_comments_to_pr(pr, comments)
 
 def clone_repo(pr: PullRequest):
     """
@@ -121,7 +91,7 @@ def clone_repo(pr: PullRequest):
     # 1. 레포지토리 clone
     print(f"Cloning repository {repo.full_name} into {dest_dir}...")
     result = subprocess.run(
-        ["git", "clone", clone_url, dest_dir], capture_output=True, text=True
+        ["git", "clone", clone_url, dest_dir], capture_output=True, text=True, check=False
     )
     if result.returncode != 0:
         raise RuntimeError(f"Failed to clone repository: {result.stderr}")
@@ -129,7 +99,9 @@ def clone_repo(pr: PullRequest):
     # 2. PR의 ref(fetch) – PR 번호에 해당하는 ref를 로컬 브랜치로 생성
     fetch_command = ["git", "fetch", "origin", f"pull/{pr_number}/head:pr-{pr_number}"]
     print(f"Fetching PR branch with command: {' '.join(fetch_command)}")
-    result = subprocess.run(fetch_command, cwd=dest_dir, capture_output=True, text=True)
+    result = subprocess.run(
+        fetch_command, cwd=dest_dir, capture_output=True, text=True, check=False
+    )
     if result.returncode != 0:
         raise RuntimeError(f"Failed to fetch PR branch: {result.stderr}")
 
@@ -137,7 +109,7 @@ def clone_repo(pr: PullRequest):
     checkout_command = ["git", "checkout", f"pr-{pr_number}"]
     print(f"Checking out branch with command: {' '.join(checkout_command)}")
     result = subprocess.run(
-        checkout_command, cwd=dest_dir, capture_output=True, text=True
+        checkout_command, cwd=dest_dir, capture_output=True, text=True, check=False
     )
     if result.returncode != 0:
         raise RuntimeError(f"Failed to checkout branch: {result.stderr}")
@@ -185,7 +157,7 @@ def user_requested_for_review(g: Github, pr: PullRequest) -> bool:
         bool: True면 "현재 유저에게 리뷰가 요청된 상태"
     """
     current_user_login = g.get_user().login
-    requested_reviewers, requested_teams = pr.get_review_requests()
+    requested_reviewers, _ = pr.get_review_requests()
 
     # 개인 계정 요청 목록에 포함되어 있다면
     if any(r.login == current_user_login for r in requested_reviewers):
@@ -202,307 +174,16 @@ def user_requested_for_review(g: Github, pr: PullRequest) -> bool:
     return False
 
 
-def get_patchset_from_git(
-    git_dir: str, pr: PullRequest, context_lines: int = 3
-) -> PatchSet:
-    """
-    'git diff --unified={context_lines} {base_ref}' 명령어를 실행해
-    unified diff를 얻은 뒤, unidiff 라이브러리로 PatchSet 객체를 만들어 반환한다.
-
-    Args:
-        pr (PullRequest): The pull request object.
-        context_lines (int): diff 생성 시 포함할 context 줄 수(기본 3줄)
-
-    Returns:
-        PatchSet: unidiff로 파싱된 diff 정보를 담은 PatchSet 객체
-    """
-    # GHA에서는 1001 사용자로 checkout 해주지만
-    # Docker 사용자는 root 로 하길 권장합니다.
-    # 따라서 safe.directory 설정이 필요합니다.
-    # 그렇지 않으면 get diff 에서 not a git repository 에러가 발생합니다.
-    result = subprocess.run(
-        ["git", "config", "--global", "--add", "safe.directory", git_dir],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to run git config. Return code: {result.returncode}\n"
-            f"stderr: {result.stderr}"
-        )
-
-    result = subprocess.run(
-        [
-            "git",
-            "fetch",
-            "origin",
-            pr.base.ref,
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=git_dir,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to run git fetch. Return code: {result.returncode}\n"
-            f"stderr: {result.stderr}"
-        )
-
-    result = subprocess.run(
-        [
-            "git",
-            "--no-pager",
-            "diff",
-            f"--unified={context_lines}",
-            f"origin/{pr.base.ref}",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=git_dir,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to run git diff. Return code: {result.returncode}\n"
-            f"stderr: {result.stderr}"
-        )
-
-    diff_text = result.stdout
-    return PatchSet(diff_text)
 
 
-def load_coding_rules(git_dir: str) -> str:
-    """
-    Load the repository or org-level coding guidelines from a file or other source.
-
-    Returns:
-        str: The entire text of the coding rules.
-    """
-    rules_path = f"{git_dir}/.github/AGENTS.md"
-    if os.path.exists(rules_path):
-        with open(rules_path, "r", encoding="utf-8") as f:
-            return f.read()
-    
-    # Fallback to root AGENTS.md if .github/AGENTS.md doesn't exist
-    root_rules_path = f"{git_dir}/AGENTS.md"
-    if os.path.exists(root_rules_path):
-        with open(root_rules_path, "r", encoding="utf-8") as f:
-            return f.read()
-    
-    raise FileNotFoundError(f"Could not find coding rules file at: {rules_path} or {root_rules_path}")
 
 
-def get_chatgpt_review(
-    patch_set: PatchSet, rules_text: str, system_prompt: str, pr: PullRequest
-) -> list[dict[str, Any]]:
-    """
-    Send patch info + coding rules to ChatGPT(O3) (via openai) and return raw response.
-
-    Args:
-        patch_set (PatchSet): The unidiff PatchSet representing changed files/lines.
-        rules_text (str): The loaded coding guidelines.
-
-    Returns:
-        list[dict[str, Any]]: List of comments generated by the AI model.
-    """
-    llm = ChatOpenAI(
-        model="o3",
-        # o3 에 대한 특수 정책:
-        # temperature does not support 0.7 with this model.
-        # Only the default (1) value is supported.
-        temperature=1,
-        model_kwargs={
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "AIReviewComments",
-                    "strict": True,
-                    "schema": SCHEMA,
-                },
-            }
-        },
-    )
-
-    prompt = build_prompt(patch_set, rules_text, pr)
-    print(f"Prompt: {prompt}")
-
-    current_time = datetime.datetime.now().strftime("%B %d, %Y")
-
-    response = llm.invoke(
-        [
-            SystemMessage(
-                content=(
-                    f"Today's date is {current_time}.\n"
-                    "You are a code reviewer. Your goal is to raise new issues or "
-                    "suggestions for the code changes.\n"
-                    "- Review the code changes according to the coding rules.\n"
-                    "- Suggest a better data structure, algorithm or strategy.\n"
-                    "- Verify the implementation satisfies requirements.\n"
-                    "- Find bugs and inconsistencies.\n"
-                    "- Do not make duplicated or similar comments.\n"
-                    "- Do not reply to the existing comments.\n"
-                    "If there are no new issues or suggestions, leave no comments.\n"
-                    + system_prompt
-                )
-            ),
-            HumanMessage(content=prompt),
-        ]
-    )
-
-    return json.loads(response.content)["comments"]
 
 
-SCHEMA = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "AIReviewComments",
-    "type": "object",
-    "properties": {
-        "comments": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "해당 코멘트가 달릴 파일의 경로",
-                    },
-                    "line": {"type": "integer", "description": "파일 내 라인 번호"},
-                    "body": {"type": "string", "description": "코멘트 내용"},
-                    "side": {
-                        "type": "string",
-                        "enum": ["LEFT", "RIGHT"],
-                        "description": "코멘트가 달릴 위치 (LEFT: 삭제된 라인, RIGHT: 추가된 라인)",
-                    },
-                },
-                "additionalProperties": False,
-                "required": ["path", "line", "body", "side"],
-            },
-        }
-    },
-    "additionalProperties": False,
-    "required": ["comments"],
-}
 
 
-def build_prompt(
-    patch_set: PatchSet,
-    rules_text: str,
-    pr: PullRequest,
-    max_diff_bytes: int = 10 * 1024,  # 기본 10KB 제한, 필요에 따라 조정 가능
-) -> str:
-    patch_summary = []
-    for patched_file in patch_set:
-        patch_summary.append(f"File: {patched_file.path}")
-        file_diff_lines = []
-        # 각 파일의 모든 hunk의 라인 정보를 모아서 하나의 문자열로 생성
-        for hunk in patched_file:
-            for line in hunk:
-                if line.is_added:
-                    file_diff_lines.append(
-                        f"L{line.target_line_no}+ : {line.value.rstrip()}"
-                    )
-                elif line.is_removed:
-                    file_diff_lines.append(
-                        f"L{line.source_line_no}- : {line.value.rstrip()}"
-                    )
-                else:
-                    file_diff_lines.append(
-                        f"L{line.source_line_no} : {line.value.rstrip()}"
-                    )
-        file_diff_text = "\n".join(file_diff_lines)
-        # utf-8 인코딩 바이트 수 기준으로 크기 체크
-        if len(file_diff_text.encode("utf-8")) > max_diff_bytes:
-            print(f"[WARN] Diff too large for {patched_file.path}")
-            patch_summary.append("Diff: [Too Long]")
-        else:
-            patch_summary.append(file_diff_text)
-    patch_text = "\n".join(patch_summary)
-
-    comments_summary = []
-    id_to_threads = {}
-    for comment in pr.get_review_comments():
-        if comment.in_reply_to_id:
-            id_to_threads[comment.in_reply_to_id].append(comment)
-        else:
-            id_to_threads[comment.id] = [comment]
-
-    for _, threads in id_to_threads.items():
-        thread_summary = []
-        for thread in threads:
-            name_or_login = thread.user.name or thread.user.login
-            thread_summary.append(f"From: {name_or_login}\n" f"{thread.body}\n")
-        comments_summary.append(
-            f"Thread At {threads[0].path}:L{threads[0].position}\n"
-            + "--------------\n".join(thread_summary)
-        )
-
-    comment_text = "==============\n".join(comments_summary)
-
-    prompt = (
-        "<coding-rules>\n"
-        f"{rules_text}\n"
-        "</coding-rules>\n\n"
-        "<pr-title>\n"
-        f"{pr.title}\n"
-        "</pr-title>\n\n"
-        "<pr-body>\n"
-        f"{pr.body}\n"
-        "</pr-body>\n\n"
-        f"<patch-diff>\n"
-        "_L13+ : This line was added in the PR._\n"
-        "_L13- : This line was removed in the PR._\n"
-        "_L13 : This line was unchanged in the PR._\n"
-        f"{patch_text}\n"
-        "</patch-diff>\n\n"
-        f"<existing-comments>\n"
-        f"{comment_text}\n"
-        "</existing-comments>\n\n"
-        "Please raise new issues or suggestions according to the coding rules."
-    )
-    return prompt
 
 
-def post_comments_to_pr(pr: PullRequest, comments: list[dict[str, Any]]) -> None:
-    """
-    Post the AI-generated comments to the specified PR using PyGithub's review comment API.
-    Args:
-        pr (PullRequest): The PyGithub PullRequest object.
-        comments (list[dict[str, Any]]): Each dict:
-            {
-              "path": str,
-              "line": int,
-              "body": str,
-              "side": str
-            }
-    Returns:
-        None
-    """
-    commit = pr.get_commits().reversed[0]
-    for c in comments:
-        try:
-            pr.create_review_comment(
-                body=c["body"],
-                commit=commit,
-                path=c["path"],
-                line=c["line"],
-                side=c["side"],
-            )
-        except GithubException as e:
-            if not any(
-                error["message"]
-                == "pull_request_review_thread.line must be part of the diff"
-                for error in e.data["errors"]
-            ):
-                raise
-            pr.create_review_comment(
-                body=f"_AI failed to specify correct line number._\n{c['body']}",
-                commit=commit,
-                path=c["path"],
-                side=c["side"],
-                subject_type="file",
-            )
 
 
 if __name__ == "__main__":
