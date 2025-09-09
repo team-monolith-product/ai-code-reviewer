@@ -76,6 +76,12 @@ REVIEW PROCESS:
 4. Post comments only for verified issues:
    - Use `gh pr comment {pr_number} -R {repo_full_name} --body "Your evidence-based comment here"`
    - If no concrete issues are found after thorough analysis, use `gh pr comment {pr_number} -R {repo_full_name} --body "LGTM - Code looks good after thorough review"`
+
+PRIORITY:
+- P1: Verified bugs with clear evidence. Reviewee must address these.
+- P2: Verified improvements with solid reasoning. Reviewee should consider these.
+- P3: Suggestions without strong evidence. Reviewee can choose to ignore these.
+- Only post P1 ~ P3 comments, never lower priority.
 """
 
     try:
