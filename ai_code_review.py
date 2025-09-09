@@ -16,7 +16,7 @@ import tempfile
 from dotenv import load_dotenv
 from github import Github
 from github.PullRequest import PullRequest
-import review_openai
+import review_claude_code
 
 # 환경 변수 로드
 load_dotenv()
@@ -73,7 +73,7 @@ def main() -> None:
     else:
         git_dir = "/github/workspace"
 
-    review_openai.review(pr, git_dir, system_prompt)
+    review_claude_code.review(pr, git_dir, system_prompt)
 
 
 

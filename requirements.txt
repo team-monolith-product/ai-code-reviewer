@@ -2,3 +2,4 @@ PyGithub
 unidiff
 langchain-openai
 dotenv
+claude-code-sdk
