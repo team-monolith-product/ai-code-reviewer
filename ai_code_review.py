@@ -79,26 +79,33 @@ def main() -> None:
     else:
         git_dir = "/github/workspace"
 
-    # 2) PullRequest의 파일별 patch를 모아서 unidiff PatchSet 생성
+    review(pr, git_dir, system_prompt)
+
+
+def review(
+    pr: PullRequest,
+    git_dir: str,
+    system_prompt: str,
+):
+    """
+    Perform AI-based code review on the given PullRequest and post comments.
+    It posts inline comments, change requests, or approves the PR based on the review results.
+    
+    Args:
+        pr (PullRequest): The PyGithub PullRequest object to review.
+        git_dir (str): The local path to the git repository.
+        system_prompt (str): The system prompt to guide the AI model.
+    """
     patch_set = get_patchset_from_git(git_dir, pr, 30)
-
-    # 3) 코딩 규칙 로드
     rules_text = load_coding_rules(git_dir)
-
-    # 4) ChatGPT(O1) API 호출 → 코드 리뷰 결과 획득
     comments = get_chatgpt_review(
         patch_set=patch_set, rules_text=rules_text, system_prompt=system_prompt, pr=pr
     )
-
-    # 4-1) 코멘트가 없으면 Approve
     if not comments:
         pr.create_review(body="LGTM :)", event="APPROVE")
         print("[SKIP] AI 리뷰 결과 코멘트가 없어 Approve 처리했습니다.")
         return
-
-    # 5) GitHub PR에 코멘트 등록
     post_comments_to_pr(pr, comments)
-
 
 def clone_repo(pr: PullRequest):
     """
