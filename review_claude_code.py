@@ -3,6 +3,7 @@ Claude Code SDK 기반 AI 코드 리뷰 구현
 """
 
 import asyncio
+import os
 
 from github.PullRequest import PullRequest
 from claude_code_sdk import ClaudeSDKClient, ClaudeCodeOptions
@@ -76,7 +77,8 @@ REVIEW PROCESS:
    - Reference documentation or established patterns when relevant
 
 4. Post comments only for P1 ~ P3 issues:
-   - Use `gh pr comment {pr_number} -R {repo_full_name} --body "[P1] Description of the verified bug with evidence..."`
+   - Use `mcp__github_inline_comment__create_inline_comment` tool to create inline comments on specific lines where issues are found
+   - For general comments, use `gh pr comment {pr_number} -R {repo_full_name} --body "[P1] Description of the verified bug with evidence..."`
    - If no concrete issues are found after thorough analysis, use `gh pr comment {pr_number} -R {repo_full_name} --body "LGTM - Code looks good after thorough review"`
 """
 
@@ -87,11 +89,12 @@ REVIEW PROCESS:
                 max_turns=40,
                 cwd=git_dir,
                 permission_mode="bypassPermissions",
+                allowed_tools=["mcp__github_inline_comment__create_inline_comment"],
             )
         ) as client:
 
             # Send review request
-            query_text = f"Please review pull request #{pr_number} in repository {repo_full_name}. Use the gh CLI tools to get the PR information and post your review comments directly using gh pr comment commands."
+            query_text = f"Please review pull request #{pr_number} in repository {repo_full_name}. Use the gh CLI tools to get the PR information and the mcp__github_inline_comment__create_inline_comment tool to post inline comments on specific lines with issues."
 
             await client.query(query_text)
 
