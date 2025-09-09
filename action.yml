@@ -13,6 +13,9 @@ inputs:
   OPENAI_API_KEY:
     description: "OpenAI API key for ChatGPT(O1)."
     required: true
+  ANTHROPIC_API_KEY:
+    description: "Anthropic API key for Claude Code SDK."
+    required: true
   PR_NUMBER:
     description: "Pull Request number."
     required: true
