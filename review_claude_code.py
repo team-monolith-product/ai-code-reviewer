@@ -16,7 +16,7 @@ def review(
     """
     Perform AI-based code review using Claude Code SDK on the given PullRequest.
     Claude will post comments directly using gh CLI tools.
-    
+
     Args:
         pr (PullRequest): The PyGithub PullRequest object to review.
         git_dir (str): The local path to the git repository.
@@ -26,23 +26,19 @@ def review(
     print("[INFO] Claude Code review process completed.")
 
 
-async def get_claude_review(
-    pr: PullRequest, 
-    git_dir: str, 
-    system_prompt: str
-) -> None:
+async def get_claude_review(pr: PullRequest, git_dir: str, system_prompt: str) -> None:
     """
     Send PR info to Claude Code SDK. Claude will post review comments directly using gh CLI.
-    
+
     Args:
         pr (PullRequest): The pull request object
-        git_dir (str): Local git directory path  
+        git_dir (str): Local git directory path
         system_prompt (str): System prompt for the AI
     """
     # Set up repository context for gh commands
     pr_number = pr.number
     repo_full_name = pr.base.repo.full_name
-    
+
     # Build enhanced system prompt that leverages Claude's tools
     enhanced_system_prompt = f"""
 {system_prompt}
@@ -88,41 +84,41 @@ REVIEW PROCESS:
         async with ClaudeSDKClient(
             options=ClaudeCodeOptions(
                 system_prompt=enhanced_system_prompt,
-                allowed_tools=[
-                    "Bash(gh pr view:*)",
-                    "Bash(gh pr diff:*)", 
-                    "Bash(gh pr comment:*)",
-                    "Read",
-                    "Grep",
-                    "WebSearch"
-                ],
                 max_turns=40,
-                cwd=git_dir
+                cwd=git_dir,
+                permission_mode="bypassPermissions",
             )
         ) as client:
-            
+
             # Send review request
             query_text = f"Please review pull request #{pr_number} in repository {repo_full_name}. Use the gh CLI tools to get the PR information and post your review comments directly using gh pr comment commands."
-            
+
             await client.query(query_text)
-            
+
             # Stream and print Claude's actions in real-time
             print("[INFO] Starting Claude Code review process...")
             response_text = ""
             async for message in client.receive_response():
-                if hasattr(message, 'content'):
+                if hasattr(message, "content"):
                     for block in message.content:
-                        if hasattr(block, 'text'):
+                        if hasattr(block, "text"):
                             text_content = block.text
                             print(f"[CLAUDE] {text_content}", flush=True)
                             response_text += text_content
                         else:
-                            print(f"[CLAUDE ACTION] {type(block).__name__}: {block}", flush=True)
+                            print(
+                                f"[CLAUDE ACTION] {type(block).__name__}: {block}",
+                                flush=True,
+                            )
                 else:
-                    print(f"[CLAUDE MESSAGE] {type(message).__name__}: {message}", flush=True)
-            
-            print(f"[INFO] Claude review completed. Full response length: {len(response_text)} characters")
-            
+                    print(
+                        f"[CLAUDE MESSAGE] {type(message).__name__}: {message}",
+                        flush=True,
+                    )
+
+            print(
+                f"[INFO] Claude review completed. Full response length: {len(response_text)} characters"
+            )
+
     except Exception as e:
         print(f"[ERROR] Claude Code SDK error: {e}")
-
