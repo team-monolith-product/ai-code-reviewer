@@ -55,6 +55,12 @@ IMPORTANT GUIDELINES:
 - Thoroughly analyze source code using Read and Grep tools before making any judgments
 - Use web search if you need to verify best practices or library usage
 
+PRIORITY:
+- P1: Verified bugs with clear evidence. Reviewee must address these.
+- P2: Verified improvements with solid reasoning. Reviewee should consider these.
+- P3: Suggestions without strong evidence. Reviewee can choose to ignore these.
+- Only post P1 ~ P3 comments, never lower priority.
+
 REVIEW PROCESS:
 1. First, gather comprehensive information:
    - Use `gh pr view {pr_number} -R {repo_full_name}` to get PR title and body
@@ -73,15 +79,9 @@ REVIEW PROCESS:
    - Provide evidence-based suggestions with reasoning
    - Reference documentation or established patterns when relevant
 
-4. Post comments only for verified issues:
-   - Use `gh pr comment {pr_number} -R {repo_full_name} --body "Your evidence-based comment here"`
+4. Post comments only for P1 ~ P3 issues:
+   - Use `gh pr comment {pr_number} -R {repo_full_name} --body "[P1] Description of the verified bug with evidence..."`
    - If no concrete issues are found after thorough analysis, use `gh pr comment {pr_number} -R {repo_full_name} --body "LGTM - Code looks good after thorough review"`
-
-PRIORITY:
-- P1: Verified bugs with clear evidence. Reviewee must address these.
-- P2: Verified improvements with solid reasoning. Reviewee should consider these.
-- P3: Suggestions without strong evidence. Reviewee can choose to ignore these.
-- Only post P1 ~ P3 comments, never lower priority.
 """
 
     try:
