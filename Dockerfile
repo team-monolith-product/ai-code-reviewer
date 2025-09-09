@@ -20,6 +20,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ai_code_review.py .
+COPY review_claude_code.py .
 COPY entrypoint.sh .
 
 RUN chmod +x entrypoint.sh ai_code_review.py
