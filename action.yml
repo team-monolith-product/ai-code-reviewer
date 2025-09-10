@@ -1,6 +1,6 @@
 # action.yml
 name: "AI Code Reviewer"
-description: "Use ChatGPT(O1) to review Pull Requests automatically."
+description: "Use OpenAI or Claude to review Pull Requests automatically."
 author: "ChangHwan Lee"
 runs:
   using: "docker"
@@ -11,14 +11,14 @@ inputs:
     description: "GitHub token for API calls."
     required: true
   OPENAI_API_KEY:
-    description: "OpenAI API key for ChatGPT(O1)."
-    required: true
+    description: "OpenAI API key for ChatGPT(O1). Either this or ANTHROPIC_API_KEY is required."
+    required: false
   ANTHROPIC_API_KEY:
-    description: "Anthropic API key for Claude Code SDK."
-    required: true
+    description: "Anthropic API key for Claude Code SDK. Either this or OPENAI_API_KEY is required."
+    required: false
   PR_NUMBER:
     description: "Pull Request number."
     required: true
   SYSTEM_PROMPT:
-    description: "System prompt for ChatGPT(O1)."
+    description: "System prompt for the AI model."
     required: false

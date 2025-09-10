@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from github import Github
 from github.PullRequest import PullRequest
 import review_claude_code
+import review_openai
 
 # 환경 변수 로드
 load_dotenv()
@@ -29,8 +30,12 @@ def main() -> None:
       - GITHUB_TOKEN (required to authenticate GitHub API calls)
       - GITHUB_REPOSITORY (e.g. "owner/repo")
       - PR_NUMBER (the pull request number to be analyzed)
-      - OPENAI_API_KEY (key for ChatGPT(O1) / OpenAI API)
+      - OPENAI_API_KEY (optional, for OpenAI API)
+      - ANTHROPIC_API_KEY (optional, for Claude Code SDK)
       - SYSTEM_PROMPT (prompt to be used for the AI model)
+
+    At least one of OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided.
+    If both are provided, OpenAI will be used.
 
     --force : 리뷰 상태와 관계없이 강제로 리뷰를 수행합니다.
     """
@@ -42,10 +47,19 @@ def main() -> None:
     # e.g. "Always answer in Korean."
     system_prompt = os.getenv("SYSTEM_PROMPT")
 
+    # API keys - at least one must be provided
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+
     if not github_token or not repo_name or not pr_number_str or not system_prompt:
         raise EnvironmentError(
             "Missing one or more required environment variables: "
             "GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, SYSTEM_PROMPT."
+        )
+
+    if not openai_api_key and not anthropic_api_key:
+        raise EnvironmentError(
+            "At least one API key must be provided: OPENAI_API_KEY or ANTHROPIC_API_KEY."
         )
 
     parser = argparse.ArgumentParser()
@@ -73,8 +87,17 @@ def main() -> None:
     else:
         git_dir = "/github/workspace"
 
-    review_claude_code.review(pr, git_dir, system_prompt)
-
+    # Choose the appropriate reviewer based on available API keys
+    # Priority: OpenAI if both are available, otherwise use whichever is available
+    if openai_api_key:
+        print("[INFO] Using OpenAI for review (API key provided)")
+        review_openai.review(pr, git_dir, system_prompt)
+    elif anthropic_api_key:
+        print("[INFO] Using Claude Code for review (API key provided)")
+        review_claude_code.review(pr, git_dir, system_prompt)
+    else:
+        # This should not happen due to the earlier check, but adding for safety
+        raise EnvironmentError("No API key available for review")
 
 
 def clone_repo(pr: PullRequest):
@@ -91,7 +114,10 @@ def clone_repo(pr: PullRequest):
     # 1. 레포지토리 clone
     print(f"Cloning repository {repo.full_name} into {dest_dir}...")
     result = subprocess.run(
-        ["git", "clone", clone_url, dest_dir], capture_output=True, text=True, check=False
+        ["git", "clone", clone_url, dest_dir],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(f"Failed to clone repository: {result.stderr}")
@@ -172,18 +198,6 @@ def user_requested_for_review(g: Github, pr: PullRequest) -> bool:
     #     pass
 
     return False
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
