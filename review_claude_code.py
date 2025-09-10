@@ -88,8 +88,15 @@ REVIEW PROCESS:
                 system_prompt=enhanced_system_prompt,
                 max_turns=40,
                 cwd=git_dir,
-                permission_mode="bypassPermissions",
-                allowed_tools=["mcp__github_inline_comment__create_inline_comment"],
+                allowed_tools=[
+                    "Bash(gh pr view:*)",
+                    "Bash(gh pr diff:*)",
+                    "Bash(gh pr comment:*)",
+                    "Read",
+                    "Grep",
+                    "WebSearch",
+                    "mcp__github_inline_comment__create_inline_comment",
+                ],
             )
         ) as client:
 
